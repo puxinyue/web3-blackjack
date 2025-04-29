@@ -21,11 +21,13 @@ const  gameState:{
     dealerHand: Card[],
     message: string,
     deck: Card[],
+    score: number,
 } = {
     playerHand: [],
     dealerHand: [],
     message: '',
-    deck: initDeck
+    deck: initDeck,
+    score: 0
  }
 
 const getRandomCard = (deck: Card[],count:number) => {
@@ -58,10 +60,90 @@ export async function GET() {
     return new Response(JSON.stringify({
         playerHand: gameState.playerHand,
         dealerHand: [gameState.dealerHand[0],{rank:'?',suit:'?'}],
-        message: gameState.message
+        message: gameState.message,
+        score: gameState.score
+    }), { status: 200 });
+}
+
+export async function POST(req:Request) {
+    const body = await req.json();
+    const {action} = body;
+    if(action === 'hit'){
+        const [playerCards,remainingDeck] = getRandomCard(gameState.deck,1);
+        gameState.playerHand.push(...playerCards);
+        gameState.deck = remainingDeck;
+        gameState.message = ''
+       const playerHandValue = calculateScore(gameState.playerHand);
+       if(playerHandValue > 21){
+        gameState.message = 'Bust! Player lose'
+        gameState.score -= 100
+       }else if(playerHandValue === 21){
+        gameState.message = 'Player BlackJack! Player win'
+        gameState.score += 100
+       }
+    }else if(action === 'stand'){
+        const [dealerCards,newDeck] = getRandomCard(gameState.deck,1);
+        gameState.dealerHand.push(...dealerCards);
+        gameState.deck = newDeck;
+        while(calculateScore(gameState.dealerHand) < 17){
+            const [dealerCards,newDeck] = getRandomCard(gameState.deck,1);
+            gameState.dealerHand.push(...dealerCards);
+            gameState.deck = newDeck;
+        }
+        const dealerHandValue = calculateScore(gameState.dealerHand);
+        if(dealerHandValue > 21){
+            gameState.message = 'Dealer Bust! Player win'
+            gameState.score += 100
+        }else if(dealerHandValue === 21){
+            gameState.message = 'Dealer BlackJack! Player lose'
+            gameState.score -= 100
+        }else{
+            const playerHandValue = calculateScore(gameState.playerHand);
+            if(playerHandValue > dealerHandValue){
+                gameState.message = 'Player win'
+                gameState.score += 100
+            }else if(playerHandValue < dealerHandValue){
+                gameState.message = 'Player lose'
+                gameState.score -= 100
+            }else{
+                // 平局
+                gameState.message = 'Draw'
+            }
+        }
+    }else {
+        return new Response(JSON.stringify({message:"Invalid action"}), { status: 400 });
+    }
+
+    return new Response(JSON.stringify({
+        playerHand: gameState.playerHand,
+        dealerHand: gameState.message == '' ? [gameState.dealerHand[0],{rank:'?',suit:'?'}] : gameState.dealerHand,
+        message: gameState.message,
+        score: gameState.score
     }), { status: 200 });
 }
 
 
+const calculateScore = (hand:Card[]) => {
+    // 计算手牌的点数
+    let score = 0;
+    let aceCount = 0;
+    for(const card of hand){
+        if(card.rank === 'A'){
+            // A可以当作1或者11来计算
+            score += 11
+            aceCount++
+        }else if(['J','Q','K'].includes(card.rank)){
+            score += 10;
+        }else{
+            score += parseInt(card.rank);
+        }
+    }
+    // 计算A的点数
+   while(score > 21 && aceCount > 0){
+    score -= 10;
+    aceCount--;
+   }
+    return score;
+}
 
 

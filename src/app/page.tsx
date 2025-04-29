@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 const Home = () => {
   const [message, setMessage] = useState('')
-  const [winner, setWinner] = useState('')
+  const [score, setScore] = useState(0)
   const [playerHand, setPlayerHand] = useState<{rank:string,suit:string}[]>([])
   const [dealerHand, setDealerHand] = useState<{rank:string,suit:string}[]>([])
 
@@ -16,7 +16,36 @@ const Home = () => {
      setPlayerHand(data?.playerHand)
      setDealerHand(data?.dealerHand)
      setMessage(data?.message)
+     setScore(data?.score)
+   }
 
+   const handleHit = async () => {
+    const resp = await fetch('/api',{method:"POST",body:JSON.stringify({action:"hit"})})
+    const data = await resp.json()
+    console.log(data)
+    setPlayerHand(data?.playerHand)
+    setDealerHand(data?.dealerHand)
+    setMessage(data?.message)
+    setScore(data?.score)
+   }
+
+   const handleStand = async () => {
+    const resp = await fetch('/api',{method:"POST",body:JSON.stringify({action:"stand"})})
+    const data = await resp.json()
+    console.log(data)
+    setPlayerHand(data?.playerHand)
+    setDealerHand(data?.dealerHand)
+    setMessage(data?.message)
+    setScore(data?.score)
+   }
+
+   const handleReset = async () => {
+    const resp = await fetch('/api',{method:"GET"})
+    const data = await resp.json()
+    setPlayerHand(data?.playerHand)
+    setDealerHand(data?.dealerHand)
+    setMessage(data?.message)
+    setScore(data?.score)
    }
 
   useEffect(()=>{
@@ -26,7 +55,7 @@ const Home = () => {
   return (
     <div className="flex flex-col gap-2 items-center justify-center h-screen">
       <h1 className="text-3xl bold">welcome to web3 game BlackJack</h1>
-      <h2 className={`text-2xl bold ${winner === 'player' ? 'text-green-300' : 'text-amber-300'}`}>{message}</h2>
+      <h2 className={`text-2xl bold ${message.includes('win') ? 'text-green-300' : 'text-amber-300'}`}>Score: {score} {message}</h2>
       <div>
           <h2>Dealer Hand:</h2>
            <div className="flex gap-2">
@@ -52,9 +81,15 @@ const Home = () => {
           </div>
       </div>
       <div className="flex gap-2">
-        <button className="bg-amber-300 p-2 rounded-md cursor-pointer">Hit</button>
-        <button className="bg-amber-300 p-2 rounded-md cursor-pointer">Stand</button>
-        <button className="bg-amber-300 p-2 rounded-md cursor-pointer">Reset</button>
+        {message == '' && (
+          <>
+            <button className="bg-amber-300 p-2 rounded-md cursor-pointer" onClick={handleHit} >Hit</button>
+            <button className="bg-amber-300 p-2 rounded-md cursor-pointer" onClick={handleStand} >Stand</button>
+          </>
+        )}
+        {message != '' && (
+          <button className="bg-amber-300 p-2 rounded-md cursor-pointer" onClick={handleReset} >Reset</button>
+        )}
       </div>
     </div>
   )
