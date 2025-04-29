@@ -61,9 +61,9 @@ const Home = () => {
            <div className="flex gap-2">
             {dealerHand.map((card,index)=>(
               <div key={index} className="w-32 h-42 border-1 border-black bg-white rounded-md flex flex-col justify-between">
-                <p className="self-start p-2 text-lg">{card.rank}</p>
-                <p className="self-center text-3xl">{card.suit}</p>
-                <p className="self-end p-2 text-lg">{card.rank}</p>
+                <p className="self-start p-2 text-lg">{card?.rank}</p>
+                <p className="self-center text-3xl">{card?.suit}</p>
+                <p className="self-end p-2 text-lg">{card?.rank}</p>
               </div>
             ))}
            </div>
@@ -73,9 +73,9 @@ const Home = () => {
            <div className="flex gap-2">
            {playerHand.map((card,index)=>(
               <div key={index} className="w-32 h-42 border-1 border-black bg-white rounded-md flex flex-col justify-between">
-                <p className="self-start p-2 text-lg">{card.rank}</p>
-                <p className="self-center text-3xl">{card.suit}</p>
-                <p className="self-end p-2 text-lg">{card.rank}</p>
+                <p className="self-start p-2 text-lg">{card?.rank}</p>
+                <p className="self-center text-3xl">{card?.suit}</p>
+                <p className="self-end p-2 text-lg">{card?.rank}</p>
               </div>
             ))}
           </div>
