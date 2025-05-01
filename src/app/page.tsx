@@ -16,7 +16,7 @@ const LoadingScreen = () => (
 const Home = () => {
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
-  const [initLoading, setInitLoading] = useState(true)
+  const [initLoading, setInitLoading] = useState(false)
   const [score, setScore] = useState(0)
   const [playerHand, setPlayerHand] = useState<{rank:string,suit:string}[]>([])
   const [dealerHand, setDealerHand] = useState<{rank:string,suit:string}[]>([])
