@@ -1,3 +1,52 @@
+// save the score into the database
+// get and put score with tables in database
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { DynamoDBDocumentClient, PutCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
+
+const TABLE_NAME = 'black_jack_score';
+
+const client = new DynamoDBClient({ 
+    region: "us-east-1", 
+    credentials: {
+        accessKeyId: process.env.AWS_USER_ACCESS_KEY_ID || "",
+        secretAccessKey: process.env.AWS_USER_ACCESS_KEY || ""
+    }
+})
+const docClient = DynamoDBDocumentClient.from(client)
+
+interface DynamoItem {
+    player: string;
+    score: number
+}
+
+async function putItem(item: DynamoItem) {
+    try {
+        const command = new PutCommand({
+            TableName: TABLE_NAME,
+            Item: item
+        })
+        await docClient.send(command)
+    } catch (error) {
+        throw new Error("Error putting item in DynamoDB: " + error)
+    }
+}
+async function getItem(player: string) {
+    try {
+        const command = new GetCommand({
+            TableName: TABLE_NAME,
+            Key: {
+                player
+            }
+        })
+        const resposne = await docClient.send(command)
+        return resposne.Item as DynamoItem || null
+    } catch (error) {
+        throw new Error("Error getting item from DynamoDB: " + error)
+    }
+}
+
+
+
 // 当游戏开始给player和dealer随机各发两张牌
 // 当player和dealer各发两张牌后，如果player和dealer的点数相等，则平局
 // 当player的点数大于21点，则玩家爆牌，游戏结束，dealer赢
@@ -8,6 +57,9 @@
 //当dealer的点数等于21点，则dealer赢
 //当player的点数小于21点，则玩家继续发牌或停止发牌
 
+import { verifyMessage } from "viem";
+import { getUserScore, updateUserScore } from "./service";
+import jwt from 'jsonwebtoken'
 interface Card {
     rank: string;
     suit: string;
@@ -44,7 +96,10 @@ const getRandomCard = (deck: Card[],count:number) => {
 }
 
 
-export async function GET() {
+export async function GET(req:Request) {
+    const {searchParams} = new URL(req.url)
+    const address = searchParams.get('address')
+    if(!address) return new Response(JSON.stringify({message:"Address is required"}), { status: 400 });
     // 重新完的时候初始化之前的值
     gameState.playerHand = [];
     gameState.dealerHand = [];
@@ -57,6 +112,18 @@ export async function GET() {
     gameState.dealerHand = dealerCards;
     gameState.deck = newDeck;
     gameState.message = ''
+    try {
+         const data = await getItem(address)
+        // const score = await getUserScore(address)
+        if(!data){
+            gameState.score = 0
+        }else{
+            gameState.score = data.score
+        }
+        
+    } catch (error) {
+        return new Response(JSON.stringify({message:"Failed to get user score"}), { status: 500 });
+    }
     return new Response(JSON.stringify({
         playerHand: gameState.playerHand,
         dealerHand: [gameState.dealerHand[0],{rank:'?',suit:'?'}],
@@ -67,7 +134,62 @@ export async function GET() {
 
 export async function POST(req:Request) {
     const body = await req.json();
-    const {action} = body;
+    const {action,address} = body;
+
+    if(action === 'auth'){
+        const {message,signature} = body;
+        const verified = await verifyMessage({address,message,signature})
+        if(!verified){
+            return new Response(JSON.stringify({message:"Invalid signature"}), { status: 400 });
+        }
+        const token = jwt.sign({address},process.env.JWT_SECRET as string,{expiresIn:'1h'})
+        return new Response(JSON.stringify({message:"Success",token}), { status: 200 });
+    }
+
+    const token = req.headers.get('Authorization')?.split(' ')[1]
+    if(!token) {
+        return new Response(JSON.stringify({
+            message:"请先登录"
+        }), { 
+            status: 401 
+        });
+    }
+
+    // 添加 try-catch 处理 JWT 验证错误
+    try {
+        const decoded = jwt.verify(token,process.env.JWT_SECRET as string) as {address:string}
+        if(address !== decoded?.address) {
+            return new Response(JSON.stringify({
+                message:"地址不匹配，请重新登录"
+            }), { 
+                status: 401 
+            });
+        }
+    } catch (error) {
+        // 处理不同类型的 JWT 错误
+        if(error instanceof jwt.TokenExpiredError) {
+            return new Response(JSON.stringify({
+                message:"登录已过期，请重新登录"
+            }), { 
+                status: 401 
+            });
+        }
+        if(error instanceof jwt.JsonWebTokenError) {
+            return new Response(JSON.stringify({
+                message:"无效的登录信息，请重新登录"
+            }), { 
+                status: 401 
+            });
+        }
+        // 其他未知错误
+        return new Response(JSON.stringify({
+            message:"验证失败，请重新登录"
+        }), { 
+            status: 401 
+        });
+    }
+
+
     if(action === 'hit'){
         const [playerCards,remainingDeck] = getRandomCard(gameState.deck,1);
         gameState.playerHand.push(...playerCards);
@@ -113,7 +235,13 @@ export async function POST(req:Request) {
     }else {
         return new Response(JSON.stringify({message:"Invalid action"}), { status: 400 });
     }
-
+    try {
+        await putItem({player:address,score:gameState.score})
+        // await updateUserScore(address,gameState.score)
+    } catch (error) {
+        return new Response(JSON.stringify({message:"Failed to update user score"}), { status: 500 });
+    }
+    
     return new Response(JSON.stringify({
         playerHand: gameState.playerHand,
         dealerHand: gameState.message == '' ? [gameState.dealerHand[0],{rank:'?',suit:'?'}] : gameState.dealerHand,
